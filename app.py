@@ -1,20 +1,18 @@
 import yfinance as yf
 import streamlit as st
 import pandas as pd
-import locale
 import requests_cache
 import datetime
 import plotly.express as px
 from streamlit_extras import add_vertical_space as avs
-
-locale.setlocale(locale.LC_ALL, 'en_IN.UTF-8')
+from babel.numbers import format_currency
 
 def format_numbers(number):
     if 'N/A' in str(number):
         return 'N/A'
     
     number=float(number)
-    formatted_number = locale.format_string("%d", number, grouping=True)
+    formatted_number = format_currency(number, 'INR', locale='en_IN')
     return formatted_number
 
 def fetch_ticker_data(ticker_name):
