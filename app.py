@@ -6,6 +6,7 @@ import datetime
 import plotly.express as px
 from streamlit_extras import add_vertical_space as avs
 from babel.numbers import format_currency
+from alpha_vantage.timeseries import TimeSeries
 
 def format_numbers(number):
     if 'N/A' in str(number):
@@ -79,18 +80,17 @@ def get_balance_sheet(ticker):
     return styled_balance_sheet
 
 
-def print_chart(ticker):
-    price=ticker.history(period='3mo')
+def print_chart(ticker,symbol,tf):
+    price=ticker.history(period=tf)
     price['Date']=price.index
     price['Date']=pd.to_datetime(price['Date'])
 
     fig=px.line(price,x='Date',y='Close')
     min_y=price['Close'].min()-10
     max_y=price['Close'].max()+10
+    st.write(min_y,max_y)
     fig.update_layout(yaxis=dict(range=[min_y,max_y]))
-    # st.line_chart(price.set_index('Date')['Close'])
     st.plotly_chart(fig)
-
     return
 
 
@@ -141,15 +141,7 @@ def render_news(ticker,company_name):
         # avs.add_vertical_space(1)
         st.markdown('<hr>', unsafe_allow_html=True) 
         
-
-def deploy_dashboard(ticker):      
-    company_name=ticker.info['longName']
-    txt=':grey['+company_name+']'
-    st.title(txt)
-    # st.header('Balance Sheet for {}'.format(company_name))
-    # styled_balance_sheet=get_balance_sheet(ticker)
-    # st.dataframe(styled_balance_sheet)
-
+def get_info_df(ticker):
     exchange=ticker.fast_info['exchange']
     currency=ticker.fast_info['currency']
     market_cap=ticker.fast_info['marketCap']
@@ -166,10 +158,61 @@ def deploy_dashboard(ticker):
 
     info=pd.DataFrame([info])
     info=info.set_index('Exchange')
-    st.dataframe(info[['Currency','Market Cap','Total Outstanding Shares','LTP']])
+    return info
 
-    print_chart(ticker)
+def get_financial_df(ticker):
 
+    financial_metrics = {
+        "symbol": ticker.info.get('symbol', 'N/A'),
+        "Div. Yield": str(round(float(ticker.info.get('dividendYield', 0.0)) * 100, 2)) if ticker.info.get('dividendYield') else 'N/A',
+        "Trailing P/E": str(round(float(ticker.info.get('trailingPE', 0.0)), 2)) if ticker.info.get('trailingPE') else 'N/A',
+        "Trailing EPS": str(round(float(ticker.info.get('trailingEps', 0.0)), 2)) if ticker.info.get('trailingEps') else 'N/A',
+        "Book Value": str(round(float(ticker.info.get('bookValue', 0.0)), 2)) if ticker.info.get('bookValue') else 'N/A',
+        "Price/Book": str(round(float(ticker.info.get('priceToBook', 0.0)), 2)) if ticker.info.get('priceToBook') else 'N/A',
+        "Current Ratio": str(round(float(ticker.info.get('currentRatio', 0.0)), 2)) if ticker.info.get('currentRatio') else 'N/A',
+        "Revenue Growth (%)": str(round(float(ticker.info.get('revenueGrowth', 0.0)) * 100, 2)) if ticker.info.get('revenueGrowth') else 'N/A',
+        "Earnings Growth (%)": str(round(float(ticker.info.get('earningsGrowth', 0.0)) * 100, 2)) if ticker.info.get('earningsGrowth') else 'N/A',
+        "EBITDA Margin (%)": str(round(float(ticker.info.get('ebitdaMargins', 0.0)) * 100, 2)) if ticker.info.get('ebitdaMargins') else 'N/A',
+    }
+
+    # Convert to DataFrame with proper formatting
+    financial_metrics_df = pd.DataFrame([financial_metrics])
+    financial_metrics_df.set_index('symbol', inplace=True)
+
+    return financial_metrics_df
+
+def deploy_dashboard(ticker):      
+    company_name=ticker.info['longName']
+    txt=':grey['+company_name+']'
+    symbol=ticker.info['symbol']
+    st.title(txt)
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        info=get_info_df(ticker)
+        st.dataframe(info[['Currency','Market Cap','Total Outstanding Shares','LTP']])
+    with col2:
+        financial_df=get_financial_df(ticker)
+        st.dataframe(financial_df[financial_df.columns.to_list()])
+
+    # with st.expander("Select Date Range"):
+    #     start_date = st.date_input('Start Date', value=datetime.date.today() - datetime.timedelta(days=30))
+    #     end_date = st.date_input('End Date', value=datetime.date.today())        
+        
+
+    buttons = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
+    selected_button = '1mo'
+    cols = st.columns(len(buttons)+20) 
+
+    with st.container():
+        cols = st.columns(len(buttons)) 
+        for i, button in enumerate(buttons):
+            with cols[i]:
+                if st.button(button,use_container_width=True):
+                    selected_button = button
+                    st.write(selected_button)
+        
+        print_chart(ticker,symbol,selected_button)
+    
     render_financials(ticker)
 
     render_news(ticker,company_name)
