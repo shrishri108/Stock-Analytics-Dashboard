@@ -6,7 +6,8 @@ import datetime
 import plotly.express as px
 from streamlit_extras import add_vertical_space as avs
 from babel.numbers import format_currency
-#from alpha_vantage.timeseries import TimeSeries
+import sqlite3
+# from alpha_vantage.timeseries import TimeSeries
 
 def format_numbers(number):
     if 'N/A' in str(number):
@@ -217,18 +218,46 @@ def deploy_dashboard(ticker):
 
     render_news(ticker,company_name)
 
-st.set_page_config(page_title="Stock Analytics Dashboard",
-                   layout='wide') 
+def log_error(e):
 
-st.title("Stock Analytics Dashboard")   
-st.write('Enter Ticker for stock info. Eg. AAPL.')
-st.markdown("Find all availale tickers [here](https://finance.yahoo.com/lookup/)")
-ticker_name=st.text_input('',placeholder='AAPL',on_change=lambda: fetch_ticker_data(ticker_name))
+    time_stamp=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    connection=sqlite3.connect('./logs/error_logs.db')
+    cursor=connection.cursor()
+    cursor.execute('''create table if not exists app_error_logs(
+               time_stamp nvarchar(30) not null,
+               error_string text not null
+               )
+               ''')   
+    cursor.execute('''
+            insert into app_error_logs(time_stamp,error_string) 
+            values(?,?)
+            ''',(time_stamp,str(e))) 
 
-ticker=fetch_ticker_data(ticker_name)
-if ticker: 
-    if len(ticker.info)==1:
-        st.error('Something Wrong with this Ticker. Please try another')    
-    else:
+if __name__ == "__main__":    
+    try:
+        st.set_page_config(page_title="Stock Analytics Dashboard",
+                        layout='wide') 
+
+        st.title("Stock Analytics Dashboard")   
+        st.write('Enter Ticker for stock info. Eg. AAPL.')
+        st.markdown("Find all availale tickers [here](https://finance.yahoo.com/lookup/)")
+
+        ticker=''
+
+        if 'ticker_name' not in st.session_state:
+            st.session_state.ticker_name = 'AAPL'
+            ticker=fetch_ticker_data(st.session_state.ticker_name)
+
+        def update_ticker():
+            st.session_state.ticker_name = st.session_state.new_ticker_name
+            fetch_ticker_data(st.session_state.ticker_name)
+
+        ticker_name=st.text_input('',placeholder='AAPL',key='new_ticker_name',on_change=update_ticker)
+        ticker=fetch_ticker_data(st.session_state.ticker_name)
+
         deploy_dashboard(ticker)
+    except Exception as e:
+        log_error(e)
+        st.error('Something went wrong! Error has been logged.')
+
 #-----------------
