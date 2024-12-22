@@ -6,7 +6,7 @@ import datetime
 import plotly.express as px
 from streamlit_extras import add_vertical_space as avs
 from babel.numbers import format_currency
-from alpha_vantage.timeseries import TimeSeries
+#from alpha_vantage.timeseries import TimeSeries
 
 def format_numbers(number):
     if 'N/A' in str(number):
